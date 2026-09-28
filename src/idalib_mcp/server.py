@@ -931,11 +931,19 @@ def _prefer_management_tools_in_tool_list(upstream) -> None:
         supervisor = upstream._require_supervisor()
         local_tools = upstream.mcp._mcp_tools_list().get("tools", [])
         local_names = {tool.get("name") for tool in local_tools}
-        worker_tools = [
-            tool
-            for tool in supervisor.worker_tools()
-            if tool.get("name") not in local_names
-        ]
+        try:
+            worker_tools = [
+                tool
+                for tool in supervisor.worker_tools()
+                if tool.get("name") not in local_names
+            ]
+        except Exception as exc:
+            # A dead worker (bad --ida-home, missing license, broken
+            # ida-config.json, ...) must degrade to a partial tool list.
+            # Letting the exception propagate through stdio() kills the whole
+            # server, leaving MCP clients blocked until their request timeout.
+            logger.warning("Worker tool listing failed; serving local tools only: %s", exc)
+            worker_tools = []
         return upstream._jsonrpc_result(
             request_obj.get("id"),
             {"tools": local_tools + worker_tools},

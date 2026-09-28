@@ -1,6 +1,6 @@
 [project]
 name = "idalib-mcp-headless"
-version = "0.1.0"
+version = "0.1.1"
 description = "Headless multi-instance IDA Pro MCP supervisor using idalib"
 readme = "README.md"
 requires-python = ">=3.11"

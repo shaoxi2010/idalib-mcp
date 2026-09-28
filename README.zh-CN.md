@@ -36,7 +36,7 @@ pip install D:\tools\IDA_PRO_9.1\idalib\python
 
 ## 使用 uvx 运行
 
-无需本地克隆仓库，`uvx` 会直接从 GitHub 构建本包并启动无头 server：
+无需本地克隆仓库，`uvx` 会直接从 GitHub 构建本包并启动无头 server，始终跟随最新 `master`：
 
 ```bash
 uvx git+https://github.com/shaoxi2010/idalib-mcp.git --ida-home /path/to/IDA_PRO_9.1
@@ -48,7 +48,9 @@ uvx git+https://github.com/shaoxi2010/idalib-mcp.git --ida-home /path/to/IDA_PRO
 uvx --from git+https://github.com/shaoxi2010/idalib-mcp.git idalib-mcp-headless --ida-home /path/to/IDA_PRO_9.1
 ```
 
-对于由 MCP 客户端自行拉起 stdio server 的场景，在客户端配置中使用同样的命令，例如：
+`uv` 会缓存仓库和构建产物，热启动只需多付一次检查新提交的轻量网络往返（实测约 2 秒）。
+
+对于由 MCP 客户端自行拉起 stdio server 的场景，在客户端配置中使用同样的命令，并调大单请求超时，例如（Cline，`cline_mcp_settings.json`）：
 
 ```json
 {
@@ -57,12 +59,20 @@ uvx --from git+https://github.com/shaoxi2010/idalib-mcp.git idalib-mcp-headless 
       "command": "uvx",
       "args": [
         "--from", "git+https://github.com/shaoxi2010/idalib-mcp.git",
-        "idalib-mcp-headless", "--stdio", "--ida-home", "/path/to/IDA_PRO_9.1"
-      ]
+        "idalib-mcp-headless", "--stdio", "--ida-home", "/opt/ida-pro-9.3"
+      ],
+      "timeout": 600
     }
   }
 }
 ```
+
+注意事项：
+
+- 务必传 `--ida-home`。不传时 worker 会信任全局的 `~/.idapro/ida-config.json`；一旦其中 `ida-install-dir` 为空或过期，所有 worker 都会失败。可用 `{"Paths": {"ida-install-dir": "/path/to/IDA"}}` 自检。
+- IDA 自动分析很容易超过 60 秒，`"timeout"` 请给足（建议 600 秒）。
+- `--ida-home` 会把 worker 的 `HOME` 隔离到临时配置目录；worker 会自动把你的 `idapro.hexlic` 许可证和 `ida.reg` 拷贝进去，许可证不受影响。
+- 启动慢的排查：推送后的首次启动会重新下载构建，GitHub 链路抖动时可能拖到分钟级。如果偶发超时，重试一次即可；若频繁出现，可临时固定 commit（`--from "git+https://github.com/shaoxi2010/idalib-mcp.git@<commit>"`，全部走 uv 缓存，更新时再换 commit），或改用 `uv tool install git+https://github.com/shaoxi2010/idalib-mcp.git` 安装、以后用 `uv tool upgrade idalib-mcp-headless` 手动更新。
 
 注意：`uvx` 每次都会在全新的隔离环境中构建，因此 `pyproject.toml` 已将 `ida-pro-mcp` 依赖固定到已知兼容的上游提交。不要改回滚动更新的 `main` archive：上游 2.x 移除了本项目扩展的 supervisor API（`IdalibSupervisor.__init__(isolated_contexts=...)`、`STDIO_DEFAULT_CONTEXT_ID` 等），会导致启动时报 `TypeError: ... unexpected keyword argument 'isolated_contexts'`。
 

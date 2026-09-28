@@ -55,5 +55,43 @@ class ConfigTests(unittest.TestCase):
                 self.assertEqual(env["HOME"], str(config_root.resolve()))
 
 
+class CopyIdaUserStateTests(unittest.TestCase):
+    def test_copies_license_and_registry_into_isolated_root(self) -> None:
+        from unittest import mock
+
+        from idalib_mcp.config import _copy_ida_user_state, idapro_user_dir
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            fake_home = Path(temp_dir) / "home"
+            src = fake_home / ".idapro"
+            src.mkdir(parents=True)
+            (src / "idapro.hexlic").write_text("license", encoding="utf-8")
+            (src / "extra.hexlic").write_text("license2", encoding="utf-8")
+            (src / "ida.reg").write_text("registry", encoding="utf-8")
+            (src / "unrelated.txt").write_text("x", encoding="utf-8")
+
+            isolated_root = Path(temp_dir) / "isolated"
+            with mock.patch("idalib_mcp.config.Path.home", return_value=fake_home):
+                copied = _copy_ida_user_state(isolated_root, system="Linux")
+
+            self.assertEqual(copied, ["extra.hexlic", "ida.reg", "idapro.hexlic"])
+            dest = idapro_user_dir(isolated_root, system="Linux")
+            self.assertTrue((dest / "idapro.hexlic").is_file())
+            self.assertTrue((dest / "ida.reg").is_file())
+            self.assertFalse((dest / "unrelated.txt").exists())
+
+    def test_missing_source_user_dir_is_noop(self) -> None:
+        from unittest import mock
+
+        from idalib_mcp.config import _copy_ida_user_state
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            fake_home = Path(temp_dir) / "home"  # no .idapro inside
+            fake_home.mkdir()
+            isolated_root = Path(temp_dir) / "isolated"
+            with mock.patch("idalib_mcp.config.Path.home", return_value=fake_home):
+                self.assertEqual(_copy_ida_user_state(isolated_root, system="Linux"), [])
+
+
 if __name__ == "__main__":
     unittest.main()
