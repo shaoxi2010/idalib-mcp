@@ -23,7 +23,7 @@ pip install -e .
 项目发布后，也可以直接通过 GitHub archive 安装：
 
 ```powershell
-pip install https://github.com/nyaoouo/idalib-mcp/archive/refs/heads/main.zip
+pip install https://github.com/shaoxi2010/idalib-mcp/archive/refs/heads/master.zip
 ```
 
 如果当前环境还没有 `idapro` Python 包，请从 IDA 安装目录安装：
@@ -33,6 +33,38 @@ pip install D:\tools\IDA_PRO_9.1\idalib\python
 ```
 
 `--ida-home` 会为 worker 进程配置 idalib，不会改写你正常使用的 `%APPDATA%\Hex-Rays\IDA Pro\ida-config.json`。
+
+## 使用 uvx 运行
+
+无需本地克隆仓库，`uvx` 会直接从 GitHub 构建本包并启动无头 server：
+
+```bash
+uvx git+https://github.com/shaoxi2010/idalib-mcp.git --ida-home /path/to/IDA_PRO_9.1
+```
+
+也可以显式指定可执行文件名：
+
+```bash
+uvx --from git+https://github.com/shaoxi2010/idalib-mcp.git idalib-mcp-headless --ida-home /path/to/IDA_PRO_9.1
+```
+
+对于由 MCP 客户端自行拉起 stdio server 的场景，在客户端配置中使用同样的命令，例如：
+
+```json
+{
+  "mcpServers": {
+    "idalib-mcp": {
+      "command": "uvx",
+      "args": [
+        "--from", "git+https://github.com/shaoxi2010/idalib-mcp.git",
+        "idalib-mcp-headless", "--stdio", "--ida-home", "/path/to/IDA_PRO_9.1"
+      ]
+    }
+  }
+}
+```
+
+注意：`uvx` 每次都会在全新的隔离环境中构建，因此 `pyproject.toml` 已将 `ida-pro-mcp` 依赖固定到已知兼容的上游提交。不要改回滚动更新的 `main` archive：上游 2.x 移除了本项目扩展的 supervisor API（`IdalibSupervisor.__init__(isolated_contexts=...)`、`STDIO_DEFAULT_CONTEXT_ID` 等），会导致启动时报 `TypeError: ... unexpected keyword argument 'isolated_contexts'`。
 
 ## MCP 客户端配置
 

@@ -9,6 +9,7 @@ from typing import Any
 from idalib_mcp.server import (
     _bound_instance_ui_url,
     _enable_path_database_auto_open,
+    _ensure_upstream_compat,
     _instance_ui_url,
     _prefer_management_tools_in_tool_list,
     _save_session_before_close,
@@ -476,6 +477,53 @@ class CancellationPatchTests(unittest.TestCase):
         })
         self.assertIsNone(response)
         self.assertTrue(handle.event.is_set())
+
+
+class UpstreamCompatGuardTests(unittest.TestCase):
+    """Startup must fail fast with an actionable message on upstream drift."""
+
+    @staticmethod
+    def _make_upstream(compatible_init: bool = True):
+        import types
+
+        upstream = types.SimpleNamespace()
+        for name in (
+            "IdalibSupervisor",
+            "WorkerSession",
+            "McpServer",
+            "dispatch_supervisor",
+            "STDIO_DEFAULT_CONTEXT_ID",
+            "SHARED_FALLBACK_CONTEXT_ID",
+            "IDALIB_MANAGEMENT_TOOLS",
+            "IDALIB_HIDDEN_PLUGIN_TOOLS",
+        ):
+            setattr(upstream, name, object())
+
+        if compatible_init:
+            def init(self, mcp, *, isolated_contexts=False, max_workers=4, worker_args=None):
+                pass
+        else:
+            # Mimics upstream 2.x: isolated_contexts/worker_args removed.
+            def init(self, mcp, *, max_workers=4):
+                pass
+
+        upstream.IdalibSupervisor = type("IdalibSupervisor", (), {"__init__": init})
+        return upstream
+
+    def test_accepts_pinned_upstream(self):
+        _ensure_upstream_compat(self._make_upstream(compatible_init=True))
+
+    def test_rejects_missing_module_attrs(self):
+        upstream = self._make_upstream(compatible_init=True)
+        del upstream.STDIO_DEFAULT_CONTEXT_ID
+        with self.assertRaises(SystemExit) as ctx:
+            _ensure_upstream_compat(upstream)
+        self.assertIn("STDIO_DEFAULT_CONTEXT_ID", str(ctx.exception))
+
+    def test_rejects_removed_init_params(self):
+        with self.assertRaises(SystemExit) as ctx:
+            _ensure_upstream_compat(self._make_upstream(compatible_init=False))
+        self.assertIn("isolated_contexts", str(ctx.exception))
 
 
 if __name__ == "__main__":

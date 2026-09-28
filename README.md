@@ -23,7 +23,7 @@ pip install -e .
 After the project is published, installation can use the GitHub archive directly:
 
 ```powershell
-pip install https://github.com/nyaoouo/idalib-mcp/archive/refs/heads/main.zip
+pip install https://github.com/shaoxi2010/idalib-mcp/archive/refs/heads/master.zip
 ```
 
 If the `idapro` Python package is not already available, install it from your IDA installation:
@@ -33,6 +33,38 @@ pip install D:\tools\IDA_PRO_9.1\idalib\python
 ```
 
 `--ida-home` configures idalib for the worker process without rewriting your normal `%APPDATA%\Hex-Rays\IDA Pro\ida-config.json`.
+
+## Run with uvx
+
+No local checkout is needed. `uvx` builds this package straight from GitHub and launches the headless server:
+
+```bash
+uvx git+https://github.com/shaoxi2010/idalib-mcp.git --ida-home /path/to/IDA_PRO_9.1
+```
+
+Or name the executable explicitly:
+
+```bash
+uvx --from git+https://github.com/shaoxi2010/idalib-mcp.git idalib-mcp-headless --ida-home /path/to/IDA_PRO_9.1
+```
+
+For MCP clients that spawn a stdio server themselves, use the same command in the client config, for example:
+
+```json
+{
+  "mcpServers": {
+    "idalib-mcp": {
+      "command": "uvx",
+      "args": [
+        "--from", "git+https://github.com/shaoxi2010/idalib-mcp.git",
+        "idalib-mcp-headless", "--stdio", "--ida-home", "/path/to/IDA_PRO_9.1"
+      ]
+    }
+  }
+}
+```
+
+Note: `uvx` builds in a fresh isolated environment every time, so the `ida-pro-mcp` dependency is pinned to a known-compatible upstream commit in `pyproject.toml`. Do not point it back at the rolling `main` archive: upstream 2.x removed the supervisor API (`IdalibSupervisor.__init__(isolated_contexts=...)`, `STDIO_DEFAULT_CONTEXT_ID`, ...) that this project extends, which fails at startup with `TypeError: ... unexpected keyword argument 'isolated_contexts'`.
 
 ## MCP Client Setup
 

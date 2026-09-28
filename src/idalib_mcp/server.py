@@ -34,6 +34,47 @@ def _load_upstream_supervisor() -> Any:
         ) from exc
 
 
+# Upstream ida-pro-mcp is pinned in pyproject.toml to the last commit that
+# still provides the supervisor API this package extends (isolated contexts,
+# shared/stdio context ids, management tool sets). If that pin is ever
+# relaxed, fail fast with an actionable message instead of a cryptic
+# TypeError raised deep inside supervisor construction.
+_REQUIRED_UPSTREAM_ATTRS = (
+    "IdalibSupervisor",
+    "WorkerSession",
+    "McpServer",
+    "dispatch_supervisor",
+    "STDIO_DEFAULT_CONTEXT_ID",
+    "SHARED_FALLBACK_CONTEXT_ID",
+    "IDALIB_MANAGEMENT_TOOLS",
+    "IDALIB_HIDDEN_PLUGIN_TOOLS",
+)
+_REQUIRED_SUPERVISOR_PARAMS = ("isolated_contexts", "max_workers", "worker_args")
+_PINNED_UPSTREAM_HINT = (
+    "Install the upstream commit pinned in pyproject.toml "
+    "(ida-pro-mcp @ 858b1e5cbf836b98cec64cc07f06429e7fb83628). Upstream 2.x "
+    "removed the supervisor API this package extends."
+)
+
+
+def _ensure_upstream_compat(upstream: Any) -> None:
+    missing = [name for name in _REQUIRED_UPSTREAM_ATTRS if not hasattr(upstream, name)]
+    if missing:
+        raise SystemExit(
+            "Incompatible 'ida-pro-mcp' package detected: missing "
+            f"{', '.join(missing)}. {_PINNED_UPSTREAM_HINT}"
+        )
+    import inspect
+
+    params = inspect.signature(upstream.IdalibSupervisor.__init__).parameters
+    unsupported = [name for name in _REQUIRED_SUPERVISOR_PARAMS if name not in params]
+    if unsupported:
+        raise SystemExit(
+            "Incompatible 'ida-pro-mcp' package detected: IdalibSupervisor.__init__ "
+            f"does not accept {', '.join(unsupported)}. {_PINNED_UPSTREAM_HINT}"
+        )
+
+
 def _json_bytes(payload: Any) -> bytes:
     return json.dumps(payload, separators=(",", ":")).encode("utf-8")
 
@@ -1111,6 +1152,7 @@ def main() -> None:
 
     ida_home = validate_ida_home(args.ida_home) if args.ida_home is not None else None
     upstream = _load_upstream_supervisor()
+    _ensure_upstream_compat(upstream)
     managed_supervisor_class = _build_managed_supervisor_class(upstream)
 
     worker_args: list[str] = []

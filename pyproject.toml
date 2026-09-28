@@ -5,13 +5,20 @@ description = "Headless multi-instance IDA Pro MCP supervisor using idalib"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "ida-pro-mcp @ https://github.com/mrexodia/ida-pro-mcp/archive/refs/heads/main.zip",
+    # Pinned to the last upstream commit that still exposes the
+    # IdalibSupervisor(isolated_contexts=..., worker_args=...) API this
+    # package subclasses. Upstream 2.x (main after 22aae5f, 2026-05-27)
+    # removed that surface, which breaks fresh installs (uvx/pip) with:
+    # TypeError: IdalibSupervisor.__init__() got an unexpected keyword
+    # argument 'isolated_contexts'. Re-pin only after porting to the new API.
+    "ida-pro-mcp @ https://github.com/mrexodia/ida-pro-mcp/archive/858b1e5cbf836b98cec64cc07f06429e7fb83628.zip",
     "tomli-w>=1.0.0",
 ]
 
 [project.urls]
-Repository = "https://github.com/nyaoouo/idalib-mcp"
-Issues = "https://github.com/nyaoouo/idalib-mcp/issues"
+Repository = "https://github.com/shaoxi2010/idalib-mcp"
+Issues = "https://github.com/shaoxi2010/idalib-mcp/issues"
+Upstream = "https://github.com/mrexodia/ida-pro-mcp"
 
 [project.scripts]
 idalib-mcp-headless = "idalib_mcp.server:main"
